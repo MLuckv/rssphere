@@ -1,0 +1,17 @@
+{
+    "feeds": [
+        {
+            "id": 1,
+            "name": "Hacker News",
+            "url": "https:\/\/news.ycombinator.com\/rss",
+            "cat": "Tech"
+        },
+        {
+            "id": 3,
+            "name": "NASA Breaking News",
+            "url": "https:\/\/www.nasa.gov\/rss\/dyn\/breaking_news.rss",
+            "cat": "Science"
+        }
+    ],
+    "saved": []
+}
