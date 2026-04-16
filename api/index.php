@@ -177,6 +177,155 @@ function pruneLowValueNodes($xpath, $content) {
     }
 }
 
+function compactText($text) {
+    $text = html_entity_decode((string)$text, ENT_QUOTES, 'UTF-8');
+    $text = (string)preg_replace('/\s+/u', ' ', $text);
+    return trim($text);
+}
+
+function isLikelyArticleHref($href) {
+    $href = trim((string)$href);
+    if ($href === '') return false;
+    if (!preg_match('/^https?:\/\//i', $href)) return false;
+    if (preg_match('/\.(jpg|jpeg|png|gif|webp|svg|avif|pdf)(\?|$)/i', $href)) return false;
+    return true;
+}
+
+function extractRelatedCardData($xpath, $node) {
+    $links = $xpath->query('.//a[@href]', $node);
+    if (!$links || $links->length === 0) return null;
+
+    $href = '';
+    $title = '';
+    foreach ($links as $a) {
+        $h = trim((string)$a->getAttribute('href'));
+        if ($href === '' && isLikelyArticleHref($h)) $href = $h;
+
+        $txt = compactText($a->textContent);
+        if ($txt !== '' && mb_strlen($txt) >= 8 && mb_strlen($txt) <= 140) {
+            if (mb_strlen($txt) > mb_strlen($title)) $title = $txt;
+        }
+    }
+    if ($href === '' || $title === '') return null;
+
+    $img = '';
+    $imgs = $xpath->query('.//img[@src]', $node);
+    if ($imgs && $imgs->length > 0) $img = trim((string)$imgs->item(0)->getAttribute('src'));
+    if ($img === '') return null;
+
+    $excerpt = '';
+    $paragraphs = $xpath->query('.//p', $node);
+    if ($paragraphs && $paragraphs->length > 0) {
+        foreach ($paragraphs as $p) {
+            $pt = compactText($p->textContent);
+            if (mb_strlen($pt) >= 24) { $excerpt = $pt; break; }
+        }
+    }
+    if ($excerpt !== '' && mb_strlen($excerpt) > 180) $excerpt = mb_substr($excerpt, 0, 180).'...';
+
+    $allText = compactText($node->textContent);
+    $meta = '';
+    if (preg_match('/\b\d+\s*min\s*read\b/i', $allText, $m)) $meta = $m[0];
+
+    return [
+        'href' => $href,
+        'title' => $title,
+        'image' => $img,
+        'meta' => $meta,
+        'excerpt' => $excerpt,
+    ];
+}
+
+function transformRelatedLinksToCards($dom, $xpath, $content) {
+    $containers = $xpath->query('.//div[count(./div) >= 2 and count(./div) <= 8]', $content);
+    if (!$containers || $containers->length === 0) return;
+
+    $list = [];
+    foreach ($containers as $c) $list[] = $c;
+
+    // Process from deepest nodes first.
+    for ($i = count($list)-1; $i >= 0; $i--) {
+        $container = $list[$i];
+        if (!$container || !$container->parentNode) continue;
+
+        $childDivs = $xpath->query('./div', $container);
+        if (!$childDivs || $childDivs->length < 2) continue;
+
+        $cards = [];
+        foreach ($childDivs as $child) {
+            $card = extractRelatedCardData($xpath, $child);
+            if ($card) $cards[] = $card;
+        }
+
+        $childCount = $childDivs->length;
+        if (count($cards) < 2) continue;
+        if (count($cards) < (int)ceil($childCount * 0.6)) continue;
+
+        $containerText = mb_strtolower(compactText($container->textContent), 'UTF-8');
+        $hasRelatedHint = strpos($containerText, 'min read') !== false
+            || strpos($containerText, 'keep exploring') !== false
+            || strpos($containerText, 'interested') !== false
+            || strpos($containerText, 'read next') !== false
+            || strpos($containerText, 'a lire aussi') !== false
+            || strpos($containerText, 'à lire aussi') !== false;
+        if (!$hasRelatedHint && count($cards) < 3) continue;
+
+        $wrap = $dom->createElement('div');
+        $wrap->setAttribute('data-related-cards', '1');
+
+        $head = $dom->createElement('div');
+        $head->setAttribute('data-related-heading', '1');
+        $head->appendChild($dom->createTextNode('A lire ensuite'));
+        $wrap->appendChild($head);
+
+        foreach ($cards as $card) {
+            $a = $dom->createElement('a');
+            $a->setAttribute('href', $card['href']);
+            $a->setAttribute('target', '_blank');
+            $a->setAttribute('rel', 'noopener noreferrer');
+            $a->setAttribute('data-related-card', '1');
+            $a->setAttribute('data-open-in-reader', '1');
+            $a->setAttribute('data-article-title', $card['title']);
+
+            $fig = $dom->createElement('figure');
+            $fig->setAttribute('data-card-image', '1');
+            $img = $dom->createElement('img');
+            $img->setAttribute('src', $card['image']);
+            $img->setAttribute('alt', '');
+            $img->setAttribute('loading', 'lazy');
+            $fig->appendChild($img);
+            $a->appendChild($fig);
+
+            $body = $dom->createElement('div');
+            $body->setAttribute('data-card-body', '1');
+
+            $title = $dom->createElement('span');
+            $title->setAttribute('data-card-title', '1');
+            $title->appendChild($dom->createTextNode($card['title']));
+            $body->appendChild($title);
+
+            if (!empty($card['meta'])) {
+                $meta = $dom->createElement('span');
+                $meta->setAttribute('data-card-meta', '1');
+                $meta->appendChild($dom->createTextNode($card['meta']));
+                $body->appendChild($meta);
+            }
+
+            if (!empty($card['excerpt'])) {
+                $excerpt = $dom->createElement('span');
+                $excerpt->setAttribute('data-card-excerpt', '1');
+                $excerpt->appendChild($dom->createTextNode($card['excerpt']));
+                $body->appendChild($excerpt);
+            }
+
+            $a->appendChild($body);
+            $wrap->appendChild($a);
+        }
+
+        $container->parentNode->replaceChild($wrap, $container);
+    }
+}
+
 function extractArticleHtml($raw, $base = '') {
     // Encoding
     if (preg_match('/charset=["\']?\s*([a-zA-Z0-9\-]+)/i', $raw, $cm)) {
@@ -364,8 +513,16 @@ function extractArticleHtml($raw, $base = '') {
         $a->setAttribute('rel','noopener noreferrer');
     }
 
+    // Turn related-link clusters into structured cards for better rendering.
+    transformRelatedLinksToCards($dom, $xpath, $content);
+
     // ── Sanitize all attributes
-    $safe = ['src','href','alt','title','target','rel','loading','colspan','rowspan','datetime','lang','scope','data-layout','data-has-caption'];
+    $safe = [
+        'src','href','alt','title','target','rel','loading','colspan','rowspan','datetime','lang','scope',
+        'data-layout','data-has-caption','data-related-cards','data-related-heading','data-related-card',
+        'data-open-in-reader','data-article-title','data-card-image','data-card-body','data-card-title',
+        'data-card-meta','data-card-excerpt'
+    ];
     $allNodes = $xpath->query('.//*', $content);
     if ($allNodes) foreach ($allNodes as $node) {
         $attrNames = [];

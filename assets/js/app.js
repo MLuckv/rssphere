@@ -95,6 +95,81 @@ function htmlHasImage(html, imageUrl) {
   return Array.from(imgs).some(img => normalizeMediaUrl(img.getAttribute('src')) === marker);
 }
 
+function isPrimaryUnmodifiedClick(event) {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+}
+
+function inferArticleTitleFromUrl(url) {
+  try {
+    const u = new URL(url);
+    const segs = u.pathname.split('/').filter(Boolean);
+    const slug = segs.pop() || u.hostname;
+    const decoded = decodeURIComponent(slug).replace(/[-_]+/g, ' ').trim();
+    if (!decoded) return 'Article externe';
+    return decoded.charAt(0).toUpperCase() + decoded.slice(1);
+  } catch (_) {
+    return 'Article externe';
+  }
+}
+
+function readerSourceNameFromUrl(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch (_) {
+    return 'Site externe';
+  }
+}
+
+function enterReaderLayout() {
+  const articlesPane = document.getElementById('articlesPane');
+  const layout = document.querySelector('.reader-layout');
+  articlesPane.classList.add('pane-hidden');
+  layout.classList.add('reader-mode', 'articles-collapsed');
+  document.getElementById('readerPanel').style.display = 'block';
+  updateToggleBtn();
+}
+
+async function openExternalArticleInReader(url, titleHint) {
+  if (!url) return;
+
+  const extId = `ext:${normalizeMediaUrl(url) || Date.now()}`;
+  const a = {
+    id: extId,
+    feedId: -1,
+    feedName: readerSourceNameFromUrl(url),
+    cat: 'Autre',
+    title: (titleHint && titleHint.trim()) || inferArticleTitleFromUrl(url),
+    link: url,
+    excerpt: 'Chargement du contenu...',
+    image: '',
+    date: 'Web',
+    saved: false,
+    unread: false,
+  };
+
+  state.activeArticle = extId;
+  enterReaderLayout();
+
+  const kws = extractKeywords(a.id, a.title, a.excerpt);
+  renderReader(a, kws, null, true);
+  updateToggleBtn();
+  renderSidebar();
+  renderArticles();
+  document.getElementById('readerPanel').scrollTop = 0;
+
+  try {
+    const res = await fetch(`${API}?action=fetch_article&url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    if (state.activeArticle !== extId) return;
+    renderReader(a, kws, data.html||null, false);
+    updateToggleBtn();
+  } catch (_) {
+    if (state.activeArticle !== extId) return;
+    renderReader(a, kws, null, false);
+    updateToggleBtn();
+  }
+}
+
 function enhanceReaderContent() {
   const root = document.querySelector('.reader-full-content');
   if (!root) return;
@@ -106,6 +181,20 @@ function enhanceReaderContent() {
     wrap.className = 'table-scroll-wrap';
     table.parentNode.insertBefore(wrap, table);
     wrap.appendChild(table);
+  });
+
+  // Open detected related cards inside the local reader instead of leaving the app.
+  root.querySelectorAll('a[data-open-in-reader="1"]').forEach(link => {
+    if (link.dataset.readerBound === '1') return;
+    link.dataset.readerBound = '1';
+    link.addEventListener('click', (event) => {
+      if (!isPrimaryUnmodifiedClick(event)) return;
+      event.preventDefault();
+      openExternalArticleInReader(
+        link.getAttribute('href'),
+        link.getAttribute('data-article-title') || link.textContent.trim()
+      );
+    });
   });
 }
 
@@ -392,12 +481,7 @@ async function openArticle(articleId, feedId) {
   state.activeArticle = articleId;
 
   // Switch to reading mode: hide articles pane by default, show reader
-  const articlesPane = document.getElementById('articlesPane');
-  const layout = document.querySelector('.reader-layout');
-  articlesPane.classList.add('pane-hidden');
-  layout.classList.add('reader-mode', 'articles-collapsed');
-  document.getElementById('readerPanel').style.display = 'block';
-  updateToggleBtn();
+  enterReaderLayout();
 
   const kws = extractKeywords(a.id, a.title, a.excerpt);
   renderReader(a, kws, null, true);
