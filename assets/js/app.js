@@ -72,6 +72,42 @@ function escHtml(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+function normalizeMediaUrl(url) {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  try {
+    const u = new URL(raw, window.location.href);
+    return `${u.host}${u.pathname}`.toLowerCase();
+  } catch (_) {
+    return raw.split('#')[0].split('?')[0].toLowerCase();
+  }
+}
+
+function htmlHasImage(html, imageUrl) {
+  if (!html || !imageUrl) return false;
+  const marker = normalizeMediaUrl(imageUrl);
+  if (!marker) return false;
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  const imgs = div.querySelectorAll('img');
+  return Array.from(imgs).some(img => normalizeMediaUrl(img.getAttribute('src')) === marker);
+}
+
+function enhanceReaderContent() {
+  const root = document.querySelector('.reader-full-content');
+  if (!root) return;
+
+  // Make wide tables scroll horizontally without breaking the reading flow.
+  root.querySelectorAll('table').forEach(table => {
+    if (table.parentElement && table.parentElement.classList.contains('table-scroll-wrap')) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'table-scroll-wrap';
+    table.parentNode.insertBefore(wrap, table);
+    wrap.appendChild(table);
+  });
+}
+
 let toastTimer;
 function toast(msg, color) {
   const el = document.getElementById('toast');
@@ -252,6 +288,8 @@ function renderReader(a, kws, fullHtml, isLoading) {
       </div>`;
   }
 
+  const showHero = !!a.image && !(fullHtml && htmlHasImage(fullHtml, a.image));
+
   panel.innerHTML = `
     <div class="reader-progress-bar"><div class="reader-progress-fill" id="rpFill"></div></div>
     <div class="reader-panel-inner">
@@ -270,7 +308,7 @@ function renderReader(a, kws, fullHtml, isLoading) {
         <span class="reader-date">${a.date}</span>
       </div>
       ${kwHtml}
-      ${a.image?`<img class="reader-hero" src="${escHtml(a.image)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
+      ${showHero?`<img class="reader-hero" src="${escHtml(a.image)}" alt="" loading="lazy" onerror="this.style.display='none'">` : ''}
       <div class="reader-content">${contentHtml}</div>
       <div class="reader-actions">
         <a class="reader-btn primary" href="${escHtml(a.link)}" target="_blank" rel="noopener">
@@ -288,6 +326,8 @@ function renderReader(a, kws, fullHtml, isLoading) {
         </button>
       </div>
     </div>`;
+
+  enhanceReaderContent();
 
   panel.onscroll = () => {
     const fill = document.getElementById('rpFill');
@@ -343,14 +383,35 @@ function toggleArticlesPane() {
 
 function updateToggleBtn() {
   const readerPanel = document.getElementById('readerPanel');
+  let stack = document.getElementById('readerSideActions');
+  if (!stack) {
+    stack = document.createElement('div');
+    stack.id = 'readerSideActions';
+    stack.className = 'reader-side-actions';
+    readerPanel.insertBefore(stack, readerPanel.firstChild);
+  }
+
+  let closeBtn = document.getElementById('closeReaderQuickBtn');
+  if (!closeBtn) {
+    closeBtn = document.createElement('button');
+    closeBtn.id = 'closeReaderQuickBtn';
+    closeBtn.className = 'close-reader-btn';
+    closeBtn.onclick = closeReader;
+    stack.appendChild(closeBtn);
+  }
+
   let btn = document.getElementById('toggleArticlesBtn');
   if (!btn) {
     btn = document.createElement('button');
     btn.id = 'toggleArticlesBtn';
     btn.className = 'toggle-articles-btn';
     btn.onclick = toggleArticlesPane;
-    readerPanel.insertBefore(btn, readerPanel.firstChild);
+    stack.appendChild(btn);
   }
+
+  closeBtn.title = 'Fermer l\'article en cours';
+  closeBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Article</span>`;
+
   const layout = document.querySelector('.reader-layout');
   const isCollapsed = layout.classList.contains('articles-collapsed');
   btn.title = isCollapsed ? 'Afficher la liste des articles' : 'Masquer la liste des articles';
@@ -367,8 +428,8 @@ function closeReader() {
   articlesPane.classList.remove('pane-hidden');
   layout.classList.remove('reader-mode', 'articles-collapsed', 'articles-visible');
   document.getElementById('readerPanel').style.display = '';
-  const toggleBtn = document.getElementById('toggleArticlesBtn');
-  if (toggleBtn) toggleBtn.remove();
+  const sideActions = document.getElementById('readerSideActions');
+  if (sideActions) sideActions.remove();
   document.getElementById('readerPanel').innerHTML = `
     <div class="reader-panel-inner">
       <div class="reader-empty">

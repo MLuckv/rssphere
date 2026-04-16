@@ -95,6 +95,53 @@ function isDecorative($src) {
     return false;
 }
 
+function canonicalMediaKey($src) {
+    $src = trim((string)$src);
+    if ($src === '') return '';
+    $parts = @parse_url($src);
+    if (!$parts) return strtolower((string)preg_replace('/[#?].*$/', '', $src));
+    $host = strtolower($parts['host'] ?? '');
+    $path = strtolower($parts['path'] ?? '');
+    if ($host !== '' || $path !== '') return $host.$path;
+    return strtolower((string)preg_replace('/[#?].*$/', '', $src));
+}
+
+function pruneLowValueNodes($xpath, $content) {
+    $nodes = $xpath->query('.//section|.//div|.//p|.//aside|.//h2|.//h3|.//h4', $content);
+    if (!$nodes) return;
+
+    $toRemove = [];
+    foreach ($nodes as $node) {
+        if (!$node || !$node->parentNode) continue;
+
+        $text = html_entity_decode((string)$node->textContent, ENT_QUOTES, 'UTF-8');
+        $text = trim((string)preg_replace('/\s+/u', ' ', $text));
+        if ($text === '') continue;
+
+        $len = mb_strlen($text);
+        $links = $xpath->query('.//a', $node);
+        $linkCount = $links ? $links->length : 0;
+        $linkTextLen = 0;
+        if ($links) {
+            foreach ($links as $a) {
+                $lt = trim((string)preg_replace('/\s+/u', ' ', (string)$a->textContent));
+                $linkTextLen += mb_strlen($lt);
+            }
+        }
+
+        $ratio = $len > 0 ? ($linkTextLen / $len) : 0;
+        $isSectionLabel = preg_match('/^\d{1,2}\s*[—\-]\s*[\p{L}][^.!?]{2,80}$/u', $text);
+        $hasArrow = preg_match('/[↗→➜]/u', $text);
+        $isLinkCluster = $linkCount >= 2 && $len <= 220 && ($ratio >= 0.62 || $hasArrow);
+
+        if ($isSectionLabel || $isLinkCluster) $toRemove[] = $node;
+    }
+
+    foreach ($toRemove as $n) {
+        if ($n->parentNode) $n->parentNode->removeChild($n);
+    }
+}
+
 function extractArticleHtml($raw, $base = '') {
     // Encoding
     if (preg_match('/charset=["\']?\s*([a-zA-Z0-9\-]+)/i', $raw, $cm)) {
@@ -174,6 +221,9 @@ function extractArticleHtml($raw, $base = '') {
     }
     if (!$content) return null;
 
+    // Remove link-heavy CTA clusters and numbered section labels often found in landing pages.
+    pruneLowValueNodes($xpath, $content);
+
     // ── Remove the first heading if it duplicates the article title (already shown in reader UI)
     $headings = $xpath->query('.//h1|.//h2', $content);
     if ($headings && $headings->length > 0) {
@@ -207,9 +257,10 @@ function extractArticleHtml($raw, $base = '') {
             $img->setAttribute('src', rtrim($base,'/').'/'.$src);
 
         $src = $img->getAttribute('src');
+        $srcKey = canonicalMediaKey($src);
 
         // Remove decorative / social / duplicate images
-        if (empty($src) || isDecorative($src) || isset($seenSrcs[$src])) {
+        if (empty($src) || isDecorative($src) || (!empty($srcKey) && isset($seenSrcs[$srcKey]))) {
             if ($img->parentNode) {
                 // If wrapped in figure, remove figure
                 $parent = $img->parentNode;
@@ -221,7 +272,7 @@ function extractArticleHtml($raw, $base = '') {
             }
             continue;
         }
-        $seenSrcs[$src] = true;
+        if (!empty($srcKey)) $seenSrcs[$srcKey] = true;
 
         // Check dimensions — skip tiny images (icons < 80px)
         $w = (int)$img->getAttribute('width');
@@ -239,19 +290,30 @@ function extractArticleHtml($raw, $base = '') {
         $img->setAttribute('loading','lazy');
         $img->setAttribute('alt', $img->getAttribute('alt') ?: '');
 
-        // Wrap in figure if not already
+        // Wrap in figure and annotate image layout for frontend styling.
+        $figure = null;
         $parent = $img->parentNode;
-        if ($parent && $parent->nodeName !== 'figure') {
-            $fig = $dom->createElement('figure');
-            $parent->insertBefore($fig, $img);
-            $fig->appendChild($img);
-            // Move alt to figcaption if present
+        if ($parent && $parent->nodeName === 'figure') {
+            $figure = $parent;
+        } elseif ($parent) {
+            $figure = $dom->createElement('figure');
+            $parent->insertBefore($figure, $img);
+            $figure->appendChild($img);
+        }
+
+        if ($figure) {
             $alt = trim($img->getAttribute('alt'));
-            if (!empty($alt) && strlen($alt) > 20) {
-                $cap = $dom->createElement('figcaption');
-                $cap->textContent = $alt;
-                $fig->appendChild($cap);
+            if (!empty($alt) && mb_strlen($alt) > 20) {
+                $caps = $figure->getElementsByTagName('figcaption');
+                if ($caps->length === 0) {
+                    $cap = $dom->createElement('figcaption');
+                    $cap->textContent = $alt;
+                    $figure->appendChild($cap);
+                }
+                $figure->setAttribute('data-has-caption', '1');
                 $img->setAttribute('alt','');
+            } else {
+                $figure->setAttribute('data-layout', 'aside');
             }
         }
     }
@@ -268,7 +330,7 @@ function extractArticleHtml($raw, $base = '') {
     }
 
     // ── Sanitize all attributes
-    $safe = ['src','href','alt','title','target','rel','loading','colspan','rowspan','datetime','lang'];
+    $safe = ['src','href','alt','title','target','rel','loading','colspan','rowspan','datetime','lang','scope','data-layout','data-has-caption'];
     $allNodes = $xpath->query('.//*', $content);
     if ($allNodes) foreach ($allNodes as $node) {
         $attrNames = [];
@@ -284,6 +346,8 @@ function extractArticleHtml($raw, $base = '') {
     $html = preg_replace('/(<br\s*\/?>\s*){3,}/i', '<br><br>', $html);
     // Remove lines that are just whitespace-text nodes
     $html = preg_replace('/\n\s*\n\s*\n/', "\n\n", $html);
+    // Remove noisy section labels like "01 — What this enables" if they survived DOM pruning.
+    $html = preg_replace('/<(p|div|h2|h3|h4)>\s*\d{1,2}\s*[—\-]\s*[^<]{2,90}\s*<\/\1>/u', '', $html);
 
     return $html ?: null;
 }
