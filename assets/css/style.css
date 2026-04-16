@@ -76,9 +76,34 @@ body {
   padding: 5px 12px; border-radius: 7px;
   font-size: 13px; font-weight: 500; cursor: pointer;
   border: 1px solid var(--border-mid); background: transparent; color: var(--text-2);
+  text-decoration: none;
   transition: all 0.15s;
 }
 .action-btn:hover { background: var(--bg); color: var(--text); }
+.action-btn.danger {
+  color: #7F1D1D;
+  border-color: rgba(220, 38, 38, 0.32);
+  background: rgba(220, 38, 38, 0.05);
+}
+.action-btn.danger:hover {
+  color: #991B1B;
+  border-color: #EF4444;
+  background: rgba(220, 38, 38, 0.11);
+}
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-mid);
+  background: linear-gradient(180deg, #FFFFFF 0%, #F7F4EE 100%);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
 .action-btn.spinning svg { animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

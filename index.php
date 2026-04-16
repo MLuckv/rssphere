@@ -1,16 +1,11 @@
 <?php
-// Initialisation de la BDD JSON
-$dataFile = __DIR__ . '/data/db.json';
-if (!file_exists($dataFile)) {
-    $default = [
-        "feeds" => [
-            ["id" => 1, "name" => "Hacker News", "url" => "https://news.ycombinator.com/rss", "cat" => "Tech"],
-            ["id" => 2, "name" => "Le Monde", "url" => "https://www.lemonde.fr/rss/une.xml", "cat" => "Actualités"],
-            ["id" => 3, "name" => "NASA", "url" => "https://www.nasa.gov/rss/dyn/breaking_news.rss", "cat" => "Science"]
-        ],
-        "saved" => []
-    ];
-    file_put_contents($dataFile, json_encode($default, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+require_once __DIR__ . '/auth_utils.php';
+auth_boot();
+
+$currentUser = auth_current_user();
+if (!$currentUser) {
+  header('Location: auth.php');
+  exit;
 }
 ?>
 <!DOCTYPE html>
@@ -57,6 +52,23 @@ if (!file_exists($dataFile)) {
         </svg>
         <span>Actualiser</span>
       </button>
+
+      <div class="user-chip" title="Connecté en tant que <?php echo htmlspecialchars($currentUser['username'], ENT_QUOTES, 'UTF-8'); ?>">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21a8 8 0 10-16 0"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span><?php echo htmlspecialchars($currentUser['username'], ENT_QUOTES, 'UTF-8'); ?></span>
+      </div>
+
+      <a class="action-btn danger" href="logout.php" title="Se déconnecter">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        <span>Déconnexion</span>
+      </a>
     </div>
   </header>
 

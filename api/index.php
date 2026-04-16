@@ -5,14 +5,78 @@ ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
+require_once __DIR__ . '/../auth_utils.php';
+auth_boot();
+$authUser = auth_require_login_json();
+
 $action = $_GET['action'] ?? '';
-$dataFile = __DIR__ . '/../data/db.json';
+$legacyDataFile = __DIR__ . '/../data/db.json';
+$dataDir = __DIR__ . '/../data/user_dbs';
+if (!is_dir($dataDir)) {
+    @mkdir($dataDir, 0775, true);
+}
+$safeUserId = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($authUser['id'] ?? ''));
+if ($safeUserId === '') {
+    http_response_code(500);
+    echo json_encode(['error' => 'Identifiant utilisateur invalide']);
+    exit;
+}
+$dataFile = $dataDir . '/db_' . $safeUserId . '.json';
+
+function defaultDB() {
+    return [
+        'feeds' => [
+            ['id' => 1, 'name' => 'Hacker News', 'url' => 'https://news.ycombinator.com/rss', 'cat' => 'Tech'],
+            ['id' => 2, 'name' => 'Le Monde', 'url' => 'https://www.lemonde.fr/rss/une.xml', 'cat' => 'Actualités'],
+            ['id' => 3, 'name' => 'NASA', 'url' => 'https://www.nasa.gov/rss/dyn/breaking_news.rss', 'cat' => 'Science'],
+        ],
+        'saved' => [],
+    ];
+}
 
 function loadDB($file) {
-    if (!file_exists($file)) return ['feeds' => [], 'saved' => []];
-    return json_decode(file_get_contents($file), true) ?: ['feeds' => [], 'saved' => []];
+    if (!file_exists($file)) {
+        $seed = null;
+        $legacyFile = $GLOBALS['legacyDataFile'] ?? '';
+        if (is_string($legacyFile) && $legacyFile !== '' && file_exists($legacyFile)) {
+            $legacy = json_decode((string)file_get_contents($legacyFile), true);
+            if (is_array($legacy)) {
+                $seed = [
+                    'feeds' => isset($legacy['feeds']) && is_array($legacy['feeds']) ? $legacy['feeds'] : [],
+                    'saved' => isset($legacy['saved']) && is_array($legacy['saved']) ? $legacy['saved'] : [],
+                ];
+            }
+        }
+
+        if (!is_array($seed)) {
+            $seed = defaultDB();
+        }
+
+        saveDB($file, $seed);
+        return $seed;
+    }
+
+    $data = json_decode((string)file_get_contents($file), true);
+    if (!is_array($data)) {
+        $data = defaultDB();
+        saveDB($file, $data);
+        return $data;
+    }
+
+    if (!isset($data['feeds']) || !is_array($data['feeds'])) $data['feeds'] = [];
+    if (!isset($data['saved']) || !is_array($data['saved'])) $data['saved'] = [];
+    return $data;
 }
+
 function saveDB($file, $db) {
+    $dir = dirname($file);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+
+    if (!isset($db['feeds']) || !is_array($db['feeds'])) $db['feeds'] = [];
+    if (!isset($db['saved']) || !is_array($db['saved'])) $db['saved'] = [];
+
     file_put_contents($file, json_encode($db, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 }
 function fetchRSS($url) {

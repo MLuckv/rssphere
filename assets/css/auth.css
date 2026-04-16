@@ -1,0 +1,229 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #F5F1E8;
+  --card: #FFFFFF;
+  --text: #161411;
+  --text-soft: #5C554B;
+  --text-faint: #948C82;
+  --border: rgba(22, 20, 17, 0.12);
+  --border-strong: rgba(22, 20, 17, 0.2);
+  --accent: #1F6D5A;
+  --accent-2: #E17B2D;
+  --accent-soft: #EAF6F2;
+  --danger: #C73939;
+  --radius: 14px;
+  --shadow: 0 2px 10px rgba(0,0,0,0.06), 0 16px 36px rgba(0,0,0,0.08);
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--font-body);
+  color: var(--text);
+  background: radial-gradient(circle at 85% 0%, #F9E9D4 0%, transparent 38%),
+              radial-gradient(circle at 0% 100%, #DBF1EA 0%, transparent 42%),
+              var(--bg);
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.auth-shell {
+  position: relative;
+  width: min(100%, 520px);
+}
+
+.auth-bg-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(12px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.orb-a {
+  width: 140px;
+  height: 140px;
+  right: -36px;
+  top: -52px;
+  background: #EFB27D;
+}
+
+.orb-b {
+  width: 120px;
+  height: 120px;
+  left: -30px;
+  bottom: -40px;
+  background: #94D1C0;
+}
+
+.auth-card {
+  position: relative;
+  background: linear-gradient(180deg, #FFFFFF 0%, #FEFCF8 100%);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+}
+
+.auth-brand-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.auth-title {
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.35rem;
+}
+
+.auth-subtitle {
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.55;
+  margin-bottom: 1.1rem;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  padding: 0.25rem;
+  border-radius: 11px;
+  background: #F2ECE3;
+  margin-bottom: 1rem;
+}
+
+.auth-tab {
+  text-decoration: none;
+  text-align: center;
+  padding: 0.55rem 0.65rem;
+  border-radius: 9px;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all .14s ease;
+}
+
+.auth-tab:hover {
+  color: var(--text);
+  background: rgba(255,255,255,0.5);
+}
+
+.auth-tab.active {
+  color: var(--text);
+  background: #FFFFFF;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.auth-alert {
+  border-radius: 10px;
+  font-size: 13px;
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.auth-alert.info {
+  background: #EAF6F2;
+  color: #155A48;
+  border: 1px solid rgba(31, 109, 90, 0.28);
+}
+
+.auth-alert.error {
+  background: #FDECEC;
+  color: #7A1E1E;
+  border: 1px solid rgba(199, 57, 57, 0.3);
+}
+
+.auth-form {
+  display: grid;
+  gap: 0.56rem;
+}
+
+.auth-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-soft);
+  margin-top: 0.35rem;
+}
+
+.auth-input {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  background: #FFFFFF;
+  border-radius: 10px;
+  padding: 0.72rem 0.78rem;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+
+.auth-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(31, 109, 90, 0.14);
+}
+
+.auth-submit {
+  margin-top: 0.8rem;
+  border: none;
+  border-radius: 11px;
+  padding: 0.75rem 0.9rem;
+  background: linear-gradient(120deg, var(--accent) 0%, #2F7D69 100%);
+  color: white;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .12s ease, filter .12s ease;
+}
+
+.auth-submit:hover {
+  filter: brightness(1.03);
+}
+
+.auth-submit:active {
+  transform: translateY(1px);
+}
+
+.auth-note {
+  margin-top: 1rem;
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+
+@media (max-width: 560px) {
+  .auth-card {
+    padding: 1.15rem;
+    border-radius: 16px;
+  }
+
+  .auth-title {
+    font-size: 28px;
+  }
+}

@@ -1,0 +1,13 @@
+{
+    "users": [
+        {
+            "id": "7e1eebbdd258a4e3429daa20",
+            "username": "Lucky",
+            "email": "edyhd@test.fr",
+            "passwordHash": "$2y$10$0Jb9fsge\/cYclUgUYStamuMWplHUcahAceF2QpcnGybnZNLBNUt.m",
+            "rememberTokenHash": null,
+            "createdAt": "2026-04-16T10:01:03+00:00",
+            "lastLoginAt": "2026-04-16T10:01:03+00:00"
+        }
+    ]
+}
