@@ -105,6 +105,20 @@ if (!file_exists($dataFile)) {
           <button class="filter-pill" id="pill-unread" onclick="setReadFilter('unread')">Non lus</button>
         </div>
       </div>
+      <div class="pane-search-row">
+        <div class="pane-search-box">
+          <svg class="pane-search-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="text"
+            id="articlesSearchInput"
+            class="pane-search-input"
+            placeholder="Rechercher par titre ou mot-clé..."
+            oninput="setArticleSearch(this.value)">
+          <button class="pane-search-clear" id="articlesSearchClear" onclick="clearArticleSearch()" title="Effacer">×</button>
+        </div>
+      </div>
       <div class="articles-list" id="articlesList">
         <div class="loading-state">
           <div class="loader"></div>

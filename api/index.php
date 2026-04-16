@@ -110,6 +110,12 @@ function pruneLowValueNodes($xpath, $content) {
     $nodes = $xpath->query('.//section|.//div|.//p|.//aside|.//h2|.//h3|.//h4', $content);
     if (!$nodes) return;
 
+    $relatedNeedles = [
+        'you may also be interested', 'you might also like', 'related article', 'related articles',
+        'recommended', 'read next', 'keep exploring', 'more from nasa',
+        'a lire aussi', 'à lire aussi', 'vous pourriez aussi', 'recommande',
+    ];
+
     $toRemove = [];
     foreach ($nodes as $node) {
         if (!$node || !$node->parentNode) continue;
@@ -117,6 +123,7 @@ function pruneLowValueNodes($xpath, $content) {
         $text = html_entity_decode((string)$node->textContent, ENT_QUOTES, 'UTF-8');
         $text = trim((string)preg_replace('/\s+/u', ' ', $text));
         if ($text === '') continue;
+        $lower = mb_strtolower($text, 'UTF-8');
 
         $len = mb_strlen($text);
         $links = $xpath->query('.//a', $node);
@@ -133,11 +140,39 @@ function pruneLowValueNodes($xpath, $content) {
         $isSectionLabel = preg_match('/^\d{1,2}\s*[—\-]\s*[\p{L}][^.!?]{2,80}$/u', $text);
         $hasArrow = preg_match('/[↗→➜]/u', $text);
         $isLinkCluster = $linkCount >= 2 && $len <= 220 && ($ratio >= 0.62 || $hasArrow);
+        $isOrphanCardLabel = preg_match('/^(article|articles|keep exploring)$/iu', $text);
 
-        if ($isSectionLabel || $isLinkCluster) $toRemove[] = $node;
+        $isRelatedHeading = false;
+        foreach ($relatedNeedles as $needle) {
+            if (strpos($lower, $needle) !== false) { $isRelatedHeading = true; break; }
+        }
+
+        if ($isRelatedHeading && $len <= 140) {
+            $container = $node;
+            for ($depth = 0; $depth < 5; $depth++) {
+                if (!$container->parentNode || $container->parentNode->nodeType !== XML_ELEMENT_NODE) break;
+                $candidate = $container->parentNode;
+                $candText = trim((string)preg_replace('/\s+/u', ' ', (string)$candidate->textContent));
+                $candLinks = $xpath->query('.//a', $candidate);
+                $candLinkCount = $candLinks ? $candLinks->length : 0;
+                if ($candLinkCount >= 2 && mb_strlen($candText) <= 3200) {
+                    $container = $candidate;
+                    continue;
+                }
+                break;
+            }
+            $toRemove[] = $container;
+            continue;
+        }
+
+        if ($isSectionLabel || $isLinkCluster || $isOrphanCardLabel) $toRemove[] = $node;
     }
 
+    $seen = [];
     foreach ($toRemove as $n) {
+        $k = spl_object_hash($n);
+        if (isset($seen[$k])) continue;
+        $seen[$k] = true;
         if ($n->parentNode) $n->parentNode->removeChild($n);
     }
 }

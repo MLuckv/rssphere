@@ -14,6 +14,7 @@ let state = {
   feedFilter:'all', readFilter:'all',
   activeArticle:null, readArticles: new Set(), loading: new Set(),
   savedSet: new Set(),
+  searchQuery:'',
 };
 
 // ── Keyword extraction ────────────────────────────────────────────────────
@@ -108,6 +109,37 @@ function enhanceReaderContent() {
   });
 }
 
+function normalizeSearchText(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function syncArticleSearchUi() {
+  const input = document.getElementById('articlesSearchInput');
+  const clear = document.getElementById('articlesSearchClear');
+  if (!input || !clear) return;
+  if (input.value !== state.searchQuery) input.value = state.searchQuery;
+  clear.style.display = state.searchQuery.trim() ? 'inline-flex' : 'none';
+}
+
+function setArticleSearch(value) {
+  state.searchQuery = String(value || '');
+  syncArticleSearchUi();
+  renderArticles();
+}
+
+function clearArticleSearch() {
+  state.searchQuery = '';
+  syncArticleSearchUi();
+  renderArticles();
+  const input = document.getElementById('articlesSearchInput');
+  if (input) input.focus();
+}
+
 let toastTimer;
 function toast(msg, color) {
   const el = document.getElementById('toast');
@@ -195,10 +227,22 @@ function getFilteredArticles() {
   else if (state.feedFilter.startsWith('cat:')) { const c=state.feedFilter.slice(4); arts=getAllArticles().filter(a=>a.cat===c); }
   else if (state.feedFilter.startsWith('feed:')) { const id=parseInt(state.feedFilter.slice(5)); arts=(ARTICLES[id]||[]).sort((a,b)=>b.timestamp-a.timestamp); }
   if (state.readFilter==='unread') arts=arts.filter(a=>a.unread);
+
+  const qNorm = normalizeSearchText(state.searchQuery);
+  if (qNorm) {
+    const terms = qNorm.split(' ').filter(Boolean);
+    arts = arts.filter(a => {
+      const kws = extractKeywords(a.id, a.title, a.excerpt);
+      const blob = normalizeSearchText(`${a.title} ${a.excerpt} ${a.feedName} ${a.cat} ${kws.join(' ')}`);
+      return terms.every(t => blob.includes(t));
+    });
+  }
+
   return arts;
 }
 
 function renderArticles() {
+  syncArticleSearchUi();
   const arts = getFilteredArticles();
   const list = document.getElementById('articlesList');
   let title = 'Tous les articles';
@@ -209,9 +253,10 @@ function renderArticles() {
   document.getElementById('paneSub').textContent = `${arts.length} article${arts.length!==1?'s':''}`;
 
   if (!arts.length) {
+    const query = state.searchQuery.trim();
     list.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <p>${!DB.feeds.length?'Ajoutez des flux dans l\'onglet "Gérer"':'Aucun article ici'}</p></div>`;
+      <p>${!DB.feeds.length?'Ajoutez des flux dans l\'onglet "Gérer"':(query?`Aucun résultat pour "${escHtml(query)}"`:'Aucun article ici')}</p></div>`;
     return;
   }
 
@@ -409,8 +454,8 @@ function updateToggleBtn() {
     stack.appendChild(btn);
   }
 
-  closeBtn.title = 'Fermer l\'article en cours';
-  closeBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Article</span>`;
+  closeBtn.title = 'Cacher l\'article en cours';
+  closeBtn.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg><span>Cacher</span>`;
 
   const layout = document.querySelector('.reader-layout');
   const isCollapsed = layout.classList.contains('articles-collapsed');
