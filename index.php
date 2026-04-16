@@ -61,7 +61,7 @@ if (!file_exists($dataFile)) {
   </header>
 
   <!-- VUE LECTEUR -->
-  <div class="reader-layout" id="tabReader">
+  <div class="reader-layout" id="tabReader" style="display:grid">
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-inner">
@@ -115,11 +115,12 @@ if (!file_exists($dataFile)) {
 
     <!-- Panneau lecture -->
     <aside class="reader-panel" id="readerPanel">
-      <div class="reader-panel-inner" id="readerPanelContent">
+      <div class="reader-panel-inner">
         <div class="reader-empty">
           <div class="reader-empty-icon">
             <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
+              <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/>
+              <path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
             </svg>
           </div>
           <p>Sélectionnez un article à lire</p>
