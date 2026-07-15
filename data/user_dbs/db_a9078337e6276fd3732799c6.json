@@ -1,0 +1,26 @@
+{
+    "version": 2,
+    "feeds": [
+        {
+            "id": 1,
+            "name": "Hacker News",
+            "url": "https://news.ycombinator.com/rss",
+            "cat": "Tech"
+        },
+        {
+            "id": 3,
+            "name": "NASA Breaking News",
+            "url": "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+            "cat": "Science"
+        }
+    ],
+    "saved": [],
+    "read": [
+        "451673979ce399a5c465a62ca6520909",
+        "57b445ed196264e31d1a462bef14f066",
+        "60009969a8cfe9da584c68fdd8266a89",
+        "2dba123450f66658ebec11518faceba3",
+        "500fa7e3b1f2c7271d3af515fb558858",
+        "60c325a6db5ed78ccfafe87fb0446ee2"
+    ]
+}

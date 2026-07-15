@@ -8,6 +8,24 @@
             "rememberTokenHash": null,
             "createdAt": "2026-04-16T10:01:03+00:00",
             "lastLoginAt": "2026-04-16T10:01:03+00:00"
+        },
+        {
+            "id": "203b804dc68526f44410b231",
+            "username": "moulin54u",
+            "email": "thegameshow52410@gmail.com",
+            "passwordHash": "$2y$10$rMAWxr1PKJ\/N\/qe3ok4XOu7bAdDMKlJjjoNJCmPk4pLhtYRMpQY\/C",
+            "rememberTokenHash": null,
+            "createdAt": "2026-04-30T14:15:21+00:00",
+            "lastLoginAt": "2026-04-30T14:15:21+00:00"
+        },
+        {
+            "id": "a9078337e6276fd3732799c6",
+            "username": "Vincent",
+            "email": "test@test.fr",
+            "passwordHash": "$2y$12$kKFDfkWMGzodXQmicmYxJ.cLt6EfJ5u4tMB7oTYf4r3bfRi0p7jLO",
+            "rememberTokenHash": "bf5e6d30e9190d6be20cd8a344d641170a961f98f90734d131cfc159096d4097",
+            "createdAt": "2026-07-15T07:50:21+00:00",
+            "lastLoginAt": "2026-07-15T07:50:21+00:00"
         }
     ]
 }

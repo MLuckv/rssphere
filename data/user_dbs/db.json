@@ -11,12 +11,6 @@
             "name": "NASA Breaking News",
             "url": "https:\/\/www.nasa.gov\/rss\/dyn\/breaking_news.rss",
             "cat": "Science"
-        },
-        {
-            "id": 4,
-            "name": "Ars Technica",
-            "url": "https:\/\/feeds.arstechnica.com\/arstechnica\/index",
-            "cat": "Tech"
         }
     ],
     "saved": []
