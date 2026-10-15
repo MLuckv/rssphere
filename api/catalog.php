@@ -68,6 +68,22 @@ function feedCatalog() {
         ['name'=>'The Paris Review','url'=>'https://www.theparisreview.org/blog/feed/','cat'=>'Culture','lang'=>'en','desc'=>'Littérature & entretiens'],
         ['name'=>'Aeon','url'=>'https://aeon.co/feed.rss','cat'=>'Culture','lang'=>'en','desc'=>'Essais, philosophie, histoire'],
 
+        // ── Histoire ────────────────────────────────────────────────────────
+        ['name'=>'Le Monde · Histoire','url'=>'https://www.lemonde.fr/histoire/rss_full.xml','cat'=>'Histoire','lang'=>'fr','desc'=>'Histoire, mémoire & historiens'],
+        ['name'=>'Le Monde · Archéologie','url'=>'https://www.lemonde.fr/archeologie/rss_full.xml','cat'=>'Histoire','lang'=>'fr','desc'=>'Fouilles & découvertes'],
+        ['name'=>'Histoire et Civilisations','url'=>'https://www.histoire-et-civilisations.com/une/rss.xml','cat'=>'Histoire','lang'=>'fr','desc'=>'Magazine d’histoire grand public'],
+        ['name'=>'Histoire pour tous','url'=>'https://www.histoire-pour-tous.fr/index.php?format=feed&type=rss','cat'=>'Histoire','lang'=>'fr','desc'=>'Histoire de France et du monde'],
+        ['name'=>'L’Histoire à la BnF','url'=>'https://histoirebnf.hypotheses.org/feed','cat'=>'Histoire','lang'=>'fr','desc'=>'Carnet des historiens de la BnF'],
+        ['name'=>'Histoire Engagée','url'=>'https://histoireengagee.ca/feed/','cat'=>'Histoire','lang'=>'fr','desc'=>'Histoire & débats publics (Québec)'],
+        ['name'=>'Smithsonian · History','url'=>'https://www.smithsonianmag.com/rss/history/','cat'=>'Histoire','lang'=>'en','desc'=>'Récits historiques du Smithsonian'],
+        ['name'=>'HistoryExtra','url'=>'https://www.historyextra.com/feed/','cat'=>'Histoire','lang'=>'en','desc'=>'Le magazine d’histoire de la BBC'],
+        ['name'=>'History Today','url'=>'https://www.historytoday.com/feed/rss.xml','cat'=>'Histoire','lang'=>'en','desc'=>'Revue d’histoire britannique'],
+        ['name'=>'JSTOR Daily','url'=>'https://daily.jstor.org/feed/','cat'=>'Histoire','lang'=>'en','desc'=>'L’actualité éclairée par la recherche'],
+        ['name'=>'World History Encyclopedia','url'=>'https://www.worldhistory.org/rss/','cat'=>'Histoire','lang'=>'en','desc'=>'Antiquité & civilisations'],
+        ['name'=>'The History Blog','url'=>'http://www.thehistoryblog.com/feed','cat'=>'Histoire','lang'=>'en','desc'=>'Archéologie & objets d’histoire'],
+        ['name'=>'Medieval Histories','url'=>'https://www.medievalhistories.com/feed/','cat'=>'Histoire','lang'=>'en','desc'=>'Le Moyen Âge au quotidien'],
+        ['name'=>'The Public Domain Review','url'=>'https://publicdomainreview.org/rss.xml','cat'=>'Histoire','lang'=>'en','desc'=>'Curiosités des archives & du domaine public'],
+
         // ── Économie ────────────────────────────────────────────────────────
         ['name'=>'Les Échos','url'=>'https://syndication.lesechos.fr/rss/rss_la_une.xml','cat'=>'Économie','lang'=>'fr','desc'=>'Finance & business FR'],
         ['name'=>'BFM Business','url'=>'https://bfmbusiness.bfmtv.com/rss/info/flux-rss/flux-toutes-les-actualites/','cat'=>'Économie','lang'=>'fr','desc'=>'Économie française'],

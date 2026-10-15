@@ -1,0 +1,42 @@
+{
+    "version": 2,
+    "feeds": [
+        {
+            "id": 1,
+            "name": "Hacker News",
+            "url": "https://news.ycombinator.com/rss",
+            "cat": "Tech"
+        },
+        {
+            "id": 3,
+            "name": "NASA Breaking News",
+            "url": "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+            "cat": "Science"
+        }
+    ],
+    "saved": [
+        {
+            "id": "511263983d43ce6599e65bcbf0cc73fe",
+            "feedId": -55,
+            "feedName": "Histoire pour tous",
+            "feedUrl": "https://www.histoire-pour-tous.fr/index.php?format=feed&type=rss",
+            "cat": "Histoire",
+            "title": "La Femme au Moyen Âge : Droits, Métiers et Réalités Historiques",
+            "link": "https://www.histoire-pour-tous.fr/dossiers/95-moyen-age/1569-la-condition-des-femmes-au-moyen-age.html",
+            "author": "",
+            "excerpt": "Quelle était la place et la vie des femmes au Moyen Age dans la société médiévale ? Celle-ci se déclinait suivant la diversité des âges et des positions sociales, suivant la place occupée dans la famille, au sein du couple par rapport à la sexualité, et au rôle primordial de la maternité. Le simple mystère de l'enfante…",
+            "image": "https://www.histoire-pour-tous.fr/images/articles/dossiers/Moyen-age/femme-miel-moyen-age.jpg",
+            "timestamp": 1774431960,
+            "date": "25 Mar 2026",
+            "savedAt": 1792075684
+        }
+    ],
+    "read": [
+        "e4cf9ae3a5ce4bfe2be4d02feffa1300",
+        "516b65070038c7d067d367dcb09631b3",
+        "6127772403be00bb7c15c4d626b48191",
+        "2c58e3bff08dc9dc8828dd22ac779c14",
+        "511263983d43ce6599e65bcbf0cc73fe",
+        "744b246fdba1d79ffd022777c522c263"
+    ]
+}

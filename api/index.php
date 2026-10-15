@@ -115,13 +115,20 @@ function loadOneFeed($url, array $identity = [], $ttl = FEED_TTL, $force = false
     return ['meta' => $m, 'articles' => $articles];
 }
 
+/** $want : 'fr', 'en' ou 'other' (toute langue connue hors fr/en). */
+function langMatches($lang, $want) {
+    $lang = strtolower(substr((string)$lang, 0, 2));
+    if ($want === 'other') return $lang !== '' && $lang !== 'fr' && $lang !== 'en';
+    return $lang === $want;
+}
+
 /** Le catalogue vu comme des flux "virtuels" (id negatif = non abonne). */
 function catalogAsFeeds() {
     $feeds = [];
     $i = 0;
     foreach (feedCatalog() as $c) {
         $i++;
-        $feeds[] = ['id' => -$i, 'name' => $c['name'], 'url' => $c['url'], 'cat' => $c['cat']];
+        $feeds[] = ['id' => -$i, 'name' => $c['name'], 'url' => $c['url'], 'cat' => $c['cat'], 'lang' => $c['lang'] ?? ''];
     }
     return $feeds;
 }
@@ -206,10 +213,13 @@ switch ($action) {
         $res = httpGet($url, 12);
         if (!$res) jsonOut(['error' => 'Page inaccessible']);
 
+        $alternatives = [];
         if (looksLikeFeed($res['body'])) {
             $feedUrl = $res['url'];
         } else {
-            $feedUrl = discoverFeedInHtml($res['body'], $res['url']);
+            // Un site declare souvent plusieurs flux (une, rubriques, commentaires) : on les garde tous.
+            $alternatives = discoverFeedsInHtml($res['body'], $res['url']);
+            $feedUrl = $alternatives[0]['url'] ?? null;
             if (!$feedUrl) {
                 // Rien de declare dans le HTML : on teste les chemins habituels.
                 foreach (httpGetMulti(commonFeedPaths($res['url']), 8) as $r) {
@@ -223,8 +233,10 @@ switch ($action) {
         if (!$feed) jsonOut(['error' => 'Flux trouvé mais illisible : ' . $feedUrl]);
 
         $db = loadDB($dataFile, $legacyDataFile);
-        $subscribed = false;
-        foreach ($db['feeds'] as $f) if ($f['url'] === $feedUrl) $subscribed = true;
+        $mine = [];
+        foreach ($db['feeds'] as $f) $mine[feedUrlKey($f['url'])] = true;
+        foreach ($alternatives as &$alt) $alt['subscribed'] = isset($mine[feedUrlKey($alt['url'])]);
+        unset($alt);
 
         jsonOut([
             'feed' => [
@@ -234,20 +246,24 @@ switch ($action) {
                 'desc' => $feed['meta']['desc'] ?? '',
                 'site' => $feed['meta']['site'] ?? '',
             ],
-            'subscribed' => $subscribed,
-            'articles'   => $feed['articles'],
+            'subscribed'   => isset($mine[feedUrlKey($feedUrl)]),
+            'articles'     => $feed['articles'],
+            'alternatives' => count($alternatives) > 1 ? $alternatives : [],
         ]);
     }
 
     // ── Recherche de sources dans le catalogue ─────────────────────────────
     case 'search_feeds': {
-        $terms = searchTerms($_GET['q'] ?? '');
+        $q = (string)($_GET['q'] ?? '');
+        $terms = searchTerms($q);
         $db = loadDB($dataFile, $legacyDataFile);
         $mine = [];
-        foreach ($db['feeds'] as $f) $mine[$f['url']] = true;
+        foreach ($db['feeds'] as $f) $mine[feedUrlKey($f['url'])] = true;
 
         $results = [];
+        $catalogKeys = [];
         foreach (feedCatalog() as $f) {
+            $catalogKeys[feedUrlKey($f['url'])] = true;
             $hay = searchNorm($f['name'] . ' ' . $f['cat'] . ' ' . $f['desc'] . ' ' . hostOf($f['url']));
             $score = 0;
             if (!$terms) {
@@ -260,12 +276,31 @@ switch ($action) {
             }
             if ($score > 0) {
                 $f['score'] = $score;
-                $f['subscribed'] = isset($mine[$f['url']]);
+                $f['source'] = 'catalog';
+                $f['subscribed'] = isset($mine[feedUrlKey($f['url'])]);
                 $results[] = $f;
             }
         }
         usort($results, fn($a, $b) => $b['score'] <=> $a['score']);
-        jsonOut(['results' => array_slice($results, 0, (int)($_GET['limit'] ?? 12))]);
+        $results = array_slice($results, 0, (int)($_GET['limit'] ?? 12));
+
+        // Au-dela du catalogue : l'annuaire de Feedly couvre des millions de flux.
+        $webError = false;
+        if ($terms && ($_GET['web'] ?? '1') === '1') {
+            $lang = (string)($_GET['lang'] ?? '');
+            $dir = searchFeedDirectory($q, min(40, max(5, (int)($_GET['webLimit'] ?? 30))), $lang === 'en' ? 'en' : 'fr');
+            if ($dir === null) {
+                $webError = true;
+            } else {
+                foreach ($dir as $f) {
+                    $k = feedUrlKey($f['url']);
+                    if (isset($catalogKeys[$k])) continue;
+                    $f['subscribed'] = isset($mine[$k]);
+                    $results[] = $f;
+                }
+            }
+        }
+        jsonOut(['results' => $results, 'webError' => $webError]);
     }
 
     case 'catalog': {
@@ -275,6 +310,7 @@ switch ($action) {
         $out = [];
         foreach (feedCatalog() as $f) {
             $f['subscribed'] = isset($mine[$f['url']]);
+            $f['source'] = 'catalog';
             $out[] = $f;
         }
         jsonOut(['catalog' => $out, 'categories' => catalogCategories()]);
@@ -303,6 +339,9 @@ switch ($action) {
             }
         }
         if ($cat !== '') $feeds = array_filter($feeds, fn($f) => $f['cat'] === $cat);
+        // Langue : seuls les flux du catalogue la connaissent ; ceux de l'abonne sont gardes.
+        $lang = (string)($_GET['lang'] ?? '');
+        if ($lang !== '') $feeds = array_filter($feeds, fn($f) => !isset($f['lang']) || langMatches($f['lang'], $lang));
         $feeds = array_values($feeds);
         if (!$feeds) jsonOut(['results' => [], 'sources' => 0, 'failed' => []]);
 
@@ -342,18 +381,18 @@ switch ($action) {
         $url = trim($_GET['url'] ?? '');
         if (!isFetchableUrl($url)) jsonOut(['html' => null, 'error' => 'URL invalide']);
 
-        $key = cacheKey('article', $url);
+        // « article2 » : les entrées de l'ancien extracteur (images perdues) ne sont pas réutilisées.
+        $key = cacheKey('article2', $url);
         $hit = cacheGet($key, ARTICLE_TTL);
-        if ($hit && array_key_exists('html', $hit)) jsonOut(['html' => $hit['html'], 'cached' => true]);
+        if ($hit && array_key_exists('html', $hit)) jsonOut($hit + ['cached' => true]);
 
         $res = httpGet($url, 14);
         if (!$res) jsonOut(['html' => null, 'error' => 'Page inaccessible']);
 
-        $parsed = parse_url($res['url']);
-        $base = ($parsed['scheme'] ?? 'https') . '://' . ($parsed['host'] ?? '');
-        $html = extractArticleHtml($res['body'], $base);
-        if ($html) cacheSet($key, ['html' => $html, 'ts' => time()]);
-        jsonOut(['html' => $html]);
+        $page = extractArticle($res['body'], $res['url']);
+        $out = ['html' => $page['html'], 'image' => $page['image'], 'lang' => $page['lang']];
+        if ($page['html']) cacheSet($key, $out);
+        jsonOut($out);
     }
 
     // ── Abonnements ────────────────────────────────────────────────────────

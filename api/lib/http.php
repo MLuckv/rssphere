@@ -181,20 +181,118 @@ function httpGetMulti(array $urls, $timeout = 12, $concurrency = 12) {
 }
 
 /**
- * Cherche l'URL d'un flux RSS/Atom dans une page HTML.
- * Retourne l'URL absolue ou null.
+ * Tous les flux RSS/Atom declares dans une page HTML (<link rel="alternate">).
+ * Retour : [['url' => absolue, 'title' => titre declare], ...], flux de commentaires en dernier.
  */
-function discoverFeedInHtml($html, $baseUrl) {
-    if (!preg_match_all('/<link\b[^>]*>/i', $html, $m)) return null;
+function discoverFeedsInHtml($html, $baseUrl) {
+    if (!preg_match_all('/<link\b[^>]*>/i', $html, $m)) return [];
+    $found = [];
     foreach ($m[0] as $tag) {
         if (!preg_match('/rel\s*=\s*["\']?[^"\'>]*alternate/i', $tag)) continue;
         if (!preg_match('#type\s*=\s*["\']?(application/(rss|atom)\+xml|application/xml|text/xml)#i', $tag)) continue;
         if (!preg_match('/href\s*=\s*["\']([^"\']+)["\']/i', $tag, $h)) continue;
-        $href = html_entity_decode(trim($h[1]), ENT_QUOTES, 'UTF-8');
-        $abs = absoluteUrl($href, $baseUrl);
-        if ($abs) return $abs;
+        $abs = absoluteUrl(html_entity_decode(trim($h[1]), ENT_QUOTES, 'UTF-8'), $baseUrl);
+        if (!$abs) continue;
+        $title = preg_match('/title\s*=\s*["\']([^"\']*)["\']/i', $tag, $t)
+            ? trim(html_entity_decode($t[1], ENT_QUOTES, 'UTF-8')) : '';
+        $k = feedUrlKey($abs);
+        if (isset($found[$k])) {
+            if ($found[$k]['title'] === '') $found[$k]['title'] = $title;
+            continue;
+        }
+        $found[$k] = ['url' => $abs, 'title' => $title];
     }
-    return null;
+    $list = array_values($found);
+    usort($list, fn($a, $b) => isCommentsFeed($a) <=> isCommentsFeed($b));
+    return $list;
+}
+
+function isCommentsFeed(array $f) {
+    return (int)(bool)preg_match('/comment/i', $f['url'] . ' ' . $f['title']);
+}
+
+/** Compatibilite : premier flux declare, ou null. */
+function discoverFeedInHtml($html, $baseUrl) {
+    $all = discoverFeedsInHtml($html, $baseUrl);
+    return $all ? $all[0]['url'] : null;
+}
+
+/**
+ * Recherche de flux sur tout le web via l'annuaire public de Feedly.
+ * $locale oriente le classement (fr, en…) ; le filtre strict par langue se fait cote client.
+ * Retour : liste normalisee, ou null si l'annuaire ne repond pas.
+ */
+function searchFeedDirectory($q, $count = 20, $locale = 'fr') {
+    $q = trim((string)$q);
+    if ($q === '') return [];
+    $locale = preg_match('/^[a-z]{2}$/', (string)$locale) ? $locale : 'fr';
+    $key = cacheKey('dir', mb_strtolower($q, 'UTF-8') . '|' . $count . '|' . $locale);
+    $hit = cacheGet($key, 6 * 3600);
+    if ($hit && isset($hit['results'])) return $hit['results'];
+
+    $res = httpGet('https://cloud.feedly.com/v3/search/feeds?' . http_build_query([
+        'query' => $q, 'count' => $count, 'locale' => $locale,
+    ]), 8);
+    if (!$res) return null;
+    $data = json_decode($res['body'], true);
+    if (!is_array($data) || !isset($data['results'])) return null;
+
+    $out = [];
+    foreach ($data['results'] as $r) {
+        if (($r['valid'] ?? true) === false) continue;
+        $url = preg_replace('#^feed/#', '', (string)($r['feedId'] ?? $r['id'] ?? ''));
+        if (!isFetchableUrl($url)) continue;
+        $title = cleanText($r['title'] ?? '') ?: hostOf($url);
+        $desc  = cleanText($r['description'] ?? '');
+        // L'annuaire ne filtre rien : « histoire » remonte aussi des récits pour adultes.
+        if (preg_match('/\b(porn\w*|xxx|sex[ey]?|érotique\w*|erotique\w*|erotic\w*|nsfw|escort\w*|hentai)\b/iu', $title . ' ' . $desc . ' ' . $url)) continue;
+        if (mb_strlen($desc) > 200) $desc = mb_substr($desc, 0, 200) . '…';
+        $out[] = [
+            'name'        => $title,
+            'url'         => $url,
+            'desc'        => $desc,
+            'site'        => (string)($r['website'] ?? ''),
+            'icon'        => (string)($r['iconUrl'] ?? ($r['visualUrl'] ?? '')),
+            'lang'        => substr((string)($r['language'] ?? ''), 0, 2),
+            'subscribers' => (int)($r['subscribers'] ?? 0),
+            'updated'     => (int)(($r['lastUpdated'] ?? $r['updated'] ?? 0) / 1000),
+            'dormant'     => ($r['state'] ?? '') === 'dormant',
+            'cat'         => guessCategory((array)($r['topics'] ?? []), $title . ' ' . $desc),
+            'source'      => 'web',
+        ];
+    }
+    cacheSet($key, ['results' => $out]);
+    return $out;
+}
+
+/** Devine une categorie de l'app a partir des sujets Feedly et du texte. */
+function guessCategory(array $topics, $text = '') {
+    $map = [
+        'Gaming'     => ['gaming', 'games', 'jeux video', 'jeu video', 'video games', 'esport', 'nintendo', 'playstation', 'xbox', 'steam'],
+        'Histoire'   => ['history', 'histoire', 'historique', 'archeology', 'archaeology', 'archeologie', 'patrimoine', 'heritage', 'genealogy', 'genealogie', 'medieval', 'moyen age', 'antiquite', 'ancient history', 'military history'],
+        'Tech'       => ['tech', 'technology', 'technologie', 'programming', 'developer', 'developpement', 'software', 'web', 'security', 'securite', 'ai', 'ia', 'intelligence artificielle', 'apple', 'android', 'linux', 'startups', 'gadgets', 'numerique'],
+        'Science'    => ['science', 'sciences', 'space', 'espace', 'astronomie', 'physics', 'physique', 'biology', 'climate', 'climat', 'environnement', 'sante', 'health', 'medecine'],
+        'Économie'   => ['economy', 'economie', 'business', 'finance', 'bourse', 'marketing', 'entrepreneur', 'investing', 'crypto'],
+        'Sport'      => ['sport', 'sports', 'football', 'foot', 'rugby', 'tennis', 'f1', 'formule 1', 'cyclisme', 'nba', 'basket'],
+        'Culture'    => ['culture', 'cinema', 'film', 'films', 'movies', 'music', 'musique', 'books', 'livres', 'litterature', 'art', 'photo', 'photography', 'series', 'tv', 'bd', 'manga', 'cuisine', 'food', 'recettes', 'mode', 'design'],
+        'Actualités' => ['news', 'actualite', 'actualites', 'actu', 'info', 'politique', 'politics', 'world', 'monde', 'france', 'international'],
+    ];
+    $topics = array_map('searchNorm', $topics);
+    foreach ($map as $cat => $words) {
+        foreach ($words as $w) if (in_array($w, $topics, true)) return $cat;
+    }
+    $text = ' ' . searchNorm($text) . ' ';
+    foreach ($map as $cat => $words) {
+        foreach ($words as $w) if (strlen($w) > 3 && strpos($text, ' ' . $w . ' ') !== false) return $cat;
+    }
+    return 'Autre';
+}
+
+/** Cle de comparaison d'URL de flux : sans schema, www ni slash final. */
+function feedUrlKey($url) {
+    $u = strtolower(trim((string)$url));
+    $u = preg_replace('#^https?://(www\.)?#', '', $u);
+    return rtrim($u, '/');
 }
 
 /** Resout une URL potentiellement relative contre une base. */
